@@ -7,7 +7,8 @@
     "gateway": "nodemon -e js,graphql index.js",
     "start": "concurrently \"npm run start-*\"",
     "start-user": "nodemon -e js,graphql --watch services/user services/user/index.js",
-    "start-location": "nodemon -e js,graphql --watch services/location services/location/index.js"
+    "start-location": "nodemon -e js,graphql --watch services/location services/location/index.js",
+    "start-feedback": "nodemon -e js,graphql --watch services/feedback services/feedback/index.js"
   },
   "dependencies": {
     "@graphql-tools/batch-delegate": "^8.1.0",

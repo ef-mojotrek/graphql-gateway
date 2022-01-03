@@ -12,6 +12,7 @@ async function makeGatewaySchema() {
   // these are simple functions that query a remote GraphQL API for JSON.
   const userExec = makeRemoteExecutor('http://localhost:4001/graphql');
   const locationExec = makeRemoteExecutor('http://localhost:4002/graphql');
+  const feedbackExec = makeRemoteExecutor('http://localhost:4003/graphql');
   const adminContext = { authHeader: 'Bearer my-app-to-app-token' };
 
   return stitchSchemas({
@@ -24,17 +25,17 @@ async function makeGatewaySchema() {
         executor: userExec,
         batch: true,
         merge: {
-            Location: {
-                selectionSet: `{ id }`,
-                fieldName: '_location',
-                args: ({ id }) => ({ id })
-            },
-            User: {
-                selectionSet: `{ id }`,
-                fieldName: 'user',
-                args: ({ id }) => ({ id: id })
-            }
+          Location: {
+            selectionSet: `{ id }`,
+            fieldName: '_location',
+            args: ({ id }) => ({ id })
+          },
+          User: {
+            selectionSet: `{ id }`,
+            fieldName: 'user',
+            args: ({ id }) => ({ id: id })
           }
+        }
       },
       {
         // 2. Manually fetch a remote SDL string, then build it into a simple schema.
@@ -45,11 +46,28 @@ async function makeGatewaySchema() {
         executor: locationExec,
         batch: true,
         merge: {
-            Location: {
-                selectionSet: `{ id }`,
-                fieldName: 'location',
-                args: ({ id }) => ({ id })
-            }
+          Location: {
+            selectionSet: `{ id }`,
+            fieldName: 'location',
+            args: ({ id }) => ({ id })
+          }
+        }
+      },
+      {
+        schema: await introspectSchema(feedbackExec, adminContext),
+        executor: feedbackExec,
+        batch: true,
+        merge: {
+          Feedback: {
+            selectionSet: `{ id }`,
+            fieldName: 'feedback',
+            args: ({ id }) => ({ id })
+          },
+          User: {
+            selectionSet: `{ id }`,
+            fieldName: '_user',
+            args: ({ id }) => ({ id })
+          }
         }
       }
     ],
@@ -74,7 +92,7 @@ async function fetchRemoteSDL(executor, context) {
   return result.data._sdl;
 }
 
-waitOn({ resources: ['tcp:4001', 'tcp:4002'] }, async () => {
+waitOn({ resources: ['tcp:4001', 'tcp:4002', 'tcp:4003'] }, async () => {
   const schema = await makeGatewaySchema();
   const app = express();
   app.use('/graphql', graphqlHTTP((req) => ({
