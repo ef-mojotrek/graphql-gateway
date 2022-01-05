@@ -22,6 +22,7 @@ module.exports = makeExecutableSchema({
     Query: {
         _user: (root, { id }) => ({ id, feedbacks: feedbacks.filter(feedback => feedback.ownerId === id) }),
         feedback: (root, { id }) => feedbacks.find(feedback => feedback.id === id),
+        feedbacks: (root, { ids }) => ids.map((id) => feedbacks.find(f => f.id === id)), 
         // feedbackByUser: (root, { ownerId }) => , 
     }
   }

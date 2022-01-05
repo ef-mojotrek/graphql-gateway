@@ -5,6 +5,7 @@ schema {
 type Query {
     _user(id: ID!): User
     feedback(id: ID!): Feedback
+    feedbacks(ids: [ID!]!): [Feedback]!
 #   feedbackByUser(userId: ID!): [Feedback]!
 }
 
