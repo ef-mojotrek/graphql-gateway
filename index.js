@@ -12,11 +12,23 @@ async function makeGatewaySchema() {
   const userExec = makeRemoteExecutor('http://localhost:4001/graphql');
   const locationExec = makeRemoteExecutor('http://localhost:4002/graphql');
   const feedbackExec = makeRemoteExecutor('http://localhost:4003/graphql');
+  const workflowFacadeExec = makeRemoteExecutor('http://3.235.246.229:8080/graphql');
+  const internalAuditExec = makeRemoteExecutor('http://3.235.246.229:8081/graphql');
   const adminContext = { authHeader: 'Bearer my-app-to-app-token' };
 
   return stitchSchemas({
     subschemas: [
       {
+        schema: await introspectSchema(workflowFacadeExec, adminContext),
+        executor: workflowFacadeExec,
+        batch: true
+      },
+      {
+        schema: await introspectSchema(internalAuditExec, adminContext),
+        executor: internalAuditExec,
+        batch: true
+      },
+      {  
         schema: await introspectSchema(userExec, adminContext),
         executor: userExec,
         batch: true,
