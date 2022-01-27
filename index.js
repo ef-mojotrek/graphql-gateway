@@ -1,97 +1,35 @@
-const waitOn = require('wait-on');
 const express = require('express');
 const { graphqlHTTP } = require('express-graphql');
 const { introspectSchema } = require('@graphql-tools/wrap');
 const { stitchSchemas } = require('@graphql-tools/stitch');
 
-// const makeRemoteExecutor = require('./lib/make_remote_executor');
-
-async function makeGatewaySchema() {
+async function makeGatewaySchema(subgraphs) {
+  const adminContext = { authHeader: 'Bearer my-app-to-app-token' };
+  const subschemas = [];
   // Make remote executors:
   // these are simple functions that query a remote GraphQL API for JSON.
-  const userExec = makeRemoteExecutor('http://localhost:4001/graphql');
-  const locationExec = makeRemoteExecutor('http://localhost:4002/graphql');
-  const feedbackExec = makeRemoteExecutor('http://localhost:4003/graphql');
-  const workflowFacadeExec = makeRemoteExecutor('http://3.235.246.229:8080/graphql');
-  const internalAuditExec = makeRemoteExecutor('http://3.235.246.229:8081/graphql');
-  const adminContext = { authHeader: 'Bearer my-app-to-app-token' };
+
+  // 
+  for(let subgraph of subgraphs) {
+    const remoteExecutor = makeRemoteExecutor(subgraph.url);
+    const schema = await introspectSchema(remoteExecutor, adminContext);
+
+    if(remoteExecutor && schema) {
+      const subschema = {
+        schema: schema,
+        executor: remoteExecutor,
+        batch: true,
+        merge: subgraph.merge
+      };
+
+      subschemas.push(subschema);
+    }
+  }
 
   return stitchSchemas({
-    subschemas: [
-      {
-        schema: await introspectSchema(workflowFacadeExec, adminContext),
-        executor: workflowFacadeExec,
-        batch: true
-      },
-      {
-        schema: await introspectSchema(internalAuditExec, adminContext),
-        executor: internalAuditExec,
-        batch: true
-      },
-      {  
-        schema: await introspectSchema(userExec, adminContext),
-        executor: userExec,
-        batch: true,
-        merge: {
-          Location: {
-            selectionSet: `{ id }`,
-            fieldName: '_location',
-            args: ({ id }) => ({ id })
-          },
-          User: {
-            selectionSet: `{ id }`,
-            fieldName: 'user',
-            args: ({ id }) => ({ id: id })
-          }
-        }
-      },
-      {
-        schema: await introspectSchema(locationExec, adminContext),
-        executor: locationExec,
-        batch: true,
-        merge: {
-          Location: {
-            selectionSet: `{ id }`,
-            fieldName: 'location',
-            args: ({ id }) => ({ id })
-          }
-        }
-      },
-      {
-        schema: await introspectSchema(feedbackExec, adminContext),
-        executor: feedbackExec,
-        batch: true,
-        merge: {
-          Feedback: {
-            selectionSet: `{ id }`,
-            fieldName: 'feedback',
-            args: ({ id }) => ({ id })
-          },
-          Feedback: {
-            selectionSet: `{ id }`,
-            fieldName: `feedbacks`,
-            key: ({ id }) => id,
-            argsFromKeys: (ids) => ({ ids }),
-          },
-          User: {
-            selectionSet: `{ id }`,
-            fieldName: '_user',
-            args: ({ id }) => ({ id })
-          }
-        }
-      }
-    ],
-    // Add additional schema directly into the gateway proxy layer.
-    // Under the hood, `stitchSchemas` is a wrapper for `makeExecutableSchema`,
-    // and accepts all of its same options. This allows extra type definitions
-    // and resolvers to be added directly into the top-level gateway proxy schema.
-    typeDefs: 'type Query { heartbeat: String! }',
-    resolvers: {
-      Query: {
-        heartbeat: () => 'OK'
-      }
-    }
+    subschemas: subschemas
   });
+  
 }
 
 
@@ -117,8 +55,68 @@ function makeRemoteExecutor(url) {
   };
 };
 
-waitOn({ resources: ['tcp:4001', 'tcp:4002', 'tcp:4003'] }, async () => {
-  const schema = await makeGatewaySchema();
+const startServer = async () => {
+  const subgrahs = [
+    {
+      url: 'https://workflowfacade-api-dev.ehs.dev/graphql/',
+      merge: {}
+    },
+    {
+      url:'https://internalaudit-api-dev.ehs.dev/graphql/' ,
+      merge: {} 
+    },
+    {
+      url: 'https://notifications-api-dev.ehs.dev/graphql/',
+      merge: {}
+    },
+    {
+      url: 'http://localhost:4001/graphql',
+      merge: {
+        Location: {
+          selectionSet: `{ id }`,
+          fieldName: '_location',
+          args: ({ id }) => ({ id })
+        },
+        User: {
+          selectionSet: `{ id }`,
+          fieldName: 'user',
+          args: ({ id }) => ({ id: id })
+        }
+      }
+    },
+    {
+      url: 'http://localhost:4002/graphql',
+      merge: {
+        Location: {
+          selectionSet: `{ id }`,
+          fieldName: 'location',
+          args: ({ id }) => ({ id })
+        }
+      }
+    },
+    {
+      url: 'http://localhost:4003/graphql',
+      merge: {
+        Feedback: {
+          selectionSet: `{ id }`,
+          fieldName: 'feedback',
+          args: ({ id }) => ({ id })
+        },
+        Feedback: {
+          selectionSet: `{ id }`,
+          fieldName: `feedbacks`,
+          key: ({ id }) => id,
+          argsFromKeys: (ids) => ({ ids }),
+        },
+        User: {
+          selectionSet: `{ id }`,
+          fieldName: '_user',
+          args: ({ id }) => ({ id })
+        }
+      }
+    }
+  ]
+  const schema = await makeGatewaySchema(subgrahs);
   const app = express();
   app.use('/graphql', graphqlHTTP((req) => ({
     schema,
@@ -126,4 +124,7 @@ waitOn({ resources: ['tcp:4001', 'tcp:4002', 'tcp:4003'] }, async () => {
     graphiql: true
   })));
   app.listen(4000, () => console.log('gateway running at http://localhost:4000/graphql'));
-});
+}
+
+startServer();
+  
