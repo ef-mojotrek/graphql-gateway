@@ -3,15 +3,15 @@ const { graphqlHTTP } = require('express-graphql');
 const { introspectSchema } = require('@graphql-tools/wrap');
 const { stitchSchemas } = require('@graphql-tools/stitch');
 
-async function makeGatewaySchema(urls) {
+async function makeGatewaySchema(subgraphs) {
   const adminContext = { authHeader: 'Bearer my-app-to-app-token' };
   const subschemas = [];
   // Make remote executors:
   // these are simple functions that query a remote GraphQL API for JSON.
 
   // 
-  for(let url of urls) {
-    const remoteExecutor = makeRemoteExecutor(url);
+  for(let subgraph of subgraphs) {
+    const remoteExecutor = makeRemoteExecutor(subgraph.url);
     const schema = await introspectSchema(remoteExecutor, adminContext);
 
     if(remoteExecutor && schema) {
@@ -19,7 +19,7 @@ async function makeGatewaySchema(urls) {
         schema: schema,
         executor: remoteExecutor,
         batch: true,
-        merge: {}
+        merge: subgraph.merge
       };
 
       subschemas.push(subschema);
@@ -56,12 +56,67 @@ function makeRemoteExecutor(url) {
 };
 
 const startServer = async () => {
-  const urls = [
-    'https://workflowfacade-api-dev.ehs.dev/graphql/',
-    'https://internalaudit-api-dev.ehs.dev/graphql/',
-    'https://notifications-api-dev.ehs.dev/graphql/'
+  const subgrahs = [
+    {
+      url: 'https://workflowfacade-api-dev.ehs.dev/graphql/',
+      merge: {}
+    },
+    {
+      url:'https://internalaudit-api-dev.ehs.dev/graphql/' ,
+      merge: {} 
+    },
+    {
+      url: 'https://notifications-api-dev.ehs.dev/graphql/',
+      merge: {}
+    },
+    {
+      url: 'http://localhost:4001/graphql',
+      merge: {
+        Location: {
+          selectionSet: `{ id }`,
+          fieldName: '_location',
+          args: ({ id }) => ({ id })
+        },
+        User: {
+          selectionSet: `{ id }`,
+          fieldName: 'user',
+          args: ({ id }) => ({ id: id })
+        }
+      }
+    },
+    {
+      url: 'http://localhost:4002/graphql',
+      merge: {
+        Location: {
+          selectionSet: `{ id }`,
+          fieldName: 'location',
+          args: ({ id }) => ({ id })
+        }
+      }
+    },
+    {
+      url: 'http://localhost:4003/graphql',
+      merge: {
+        Feedback: {
+          selectionSet: `{ id }`,
+          fieldName: 'feedback',
+          args: ({ id }) => ({ id })
+        },
+        Feedback: {
+          selectionSet: `{ id }`,
+          fieldName: `feedbacks`,
+          key: ({ id }) => id,
+          argsFromKeys: (ids) => ({ ids }),
+        },
+        User: {
+          selectionSet: `{ id }`,
+          fieldName: '_user',
+          args: ({ id }) => ({ id })
+        }
+      }
+    }
   ]
-  const schema = await makeGatewaySchema(urls);
+  const schema = await makeGatewaySchema(subgrahs);
   const app = express();
   app.use('/graphql', graphqlHTTP((req) => ({
     schema,
