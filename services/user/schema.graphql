@@ -4,7 +4,7 @@ schema {
 
 type Query {
   user(id: ID!): User
-  _location(key: ID!): Location # <adding _ prefix in order to maintain uniqueness across multiple schemas>
+  _location(id: ID!): Location # <adding _ prefix in order to maintain uniqueness across multiple schemas>
 }
 
 type User {
