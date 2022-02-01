@@ -59,11 +59,23 @@ const startServer = async () => {
   const subgrahs = [
     {
       url: 'https://workflowfacade-api-dev.ehs.dev/graphql/',
-      merge: {}
+      merge: {
+        Workflow: {
+          selectionSet: `{ id }`,
+          fieldName: 'workflow',
+          args: ({ id }) => ({ id })
+        }
+      }
     },
     {
       url:'https://internalaudit-api-dev.ehs.dev/graphql/' ,
-      merge: {} 
+      merge: {
+        InternalAuditGraphQueryModel: {
+          selectionSet: `{ id }`,
+          fieldName: 'InternalAuditGraphQueryModel',
+          args: ({ id }) => ({ id })
+        }
+      } 
     },
     {
       url: 'https://notifications-api-dev.ehs.dev/graphql/',
