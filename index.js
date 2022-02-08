@@ -1,6 +1,6 @@
 const express = require('express');
+const { introspectSchema, RenameTypes } = require('@graphql-tools/wrap');
 const { graphqlHTTP } = require('express-graphql');
-const { introspectSchema } = require('@graphql-tools/wrap');
 const { stitchSchemas } = require('@graphql-tools/stitch');
 
 async function makeGatewaySchema(subgraphs) {
@@ -19,7 +19,8 @@ async function makeGatewaySchema(subgraphs) {
         schema: schema,
         executor: remoteExecutor,
         batch: true,
-        merge: subgraph.merge
+        merge: subgraph.merge,
+        transforms: subgraph.transforms || []
       };
 
       subschemas.push(subschema);
@@ -74,8 +75,12 @@ const startServer = async () => {
           selectionSet: `{ id }`,
           fieldName: 'InternalAuditGraphQueryModel',
           args: ({ id }) => ({ id })
-        }
-      } 
+        },
+      },
+      transforms: [
+        new RenameTypes((name) => {return name.includes(`WorkflowGraphQueryModel`) ? `internalAudit_Workflow` : name})
+        // new RenameRootFields((op, name) => `rainforest${name.charAt(0).toUpperCase()}${name.slice(1)}`),
+      ]
     },
     {
       url: 'https://notifications-api-dev.ehs.dev/graphql/',
