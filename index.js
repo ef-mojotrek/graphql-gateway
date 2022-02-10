@@ -71,14 +71,23 @@ const startServer = async () => {
     {
       url:'https://internalaudit-api-dev.ehs.dev/graphql/' ,
       merge: {
-        InternalAuditGraphQueryModel: {
-          selectionSet: `{ id }`,
-          fieldName: 'InternalAuditGraphQueryModel',
-          args: ({ id }) => ({ id })
-        },
+        InternalAuditGraphQueryModel: [
+          {
+            selectionSet: `{ id }`,
+            fieldName: 'InternalAuditGraphQueryModel',
+            args: ({ id }) => ({ id })
+          }
+        ],
+        // Workflow: [
+        //   {
+        //     selectionSet: `{ id }`,
+        //     fieldName: `workflow`,
+        //     args: ({ id }) => ({ id })
+        //   }
+        // ]
       },
       transforms: [
-        new RenameTypes((name) => {return name.includes(`WorkflowGraphQueryModel`) ? `internalAudit_Workflow` : name})
+        new RenameTypes((name) => {return name.includes(`WorkflowGraphQueryModel`) ? `_Workflow` : name})
         // new RenameRootFields((op, name) => `rainforest${name.charAt(0).toUpperCase()}${name.slice(1)}`),
       ]
     },
